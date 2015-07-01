@@ -1,21 +1,27 @@
-/* Kiana Kim - 6/29/15
- * PID implementation w/ Inverted Pendulum
- * attempt to use PID control to read pendulum position and adjust
- * change. help from "improving the beginner's pid"
+/* Kiana Kim
+ * 6/30/15
+ * Description: PID implementation w/ using encoder mounted on pendulum
+ * to read and make adjustments based on the position of the pendulum.
+ * help from "Improving the Beginner's PID" blog post
  */
 
 #include <Encoder.h>
 
 Encoder myEnc (2,3);
-float vout = 190; //about neutral w/ offset
+float vout = 190; 
 
-//PID Variables
-unsigned long lastTime;
-double input, output;
-double setpoint = 2070; //about upright in encoder counts
-double kp, ki, kd; //do i need to set these
-double errSum, lastError;
-int sampleTime = 1000; //time you want in between each run of PID, 1 sec
+//PID variables
+unsigned long lastTime; 
+double input, output, error;
+double setpoint = 0;
+double kp = 5, //from 1.5 
+ki = 0, 
+kd = 4;
+double errSum, lastErr;
+int sampleTime = 70;
+int outputEdit;
+
+int controlDirection = 1; //0 = left, 1 = right
 
 void setup() {
   pinMode(6, OUTPUT);
@@ -23,39 +29,58 @@ void setup() {
   Serial.begin(9600);
 }
 
-void loop() { //main loop
-  long input = myEnc.read(); //reads encoder value as 'input'
+void loop() {
+  //long input = myEnc.read();
+  determineDirection();
   Compute();
-  SetTunings();
-  
-  analogWrite(6, output);
-  Serial.println(output);
-  //what do I do with the output? where do I put this? how is the setpoint...set? do I need to call void Compute()
-  //would it be like:
-  //vout = output; (with limiters 0-255)
+  limitVoltage();
+
+  analogWrite(6,vout);
+  Serial.println(vout);
+  //Serial.println(error);
+  //Serial.println(output);
+  //Serial.println(outputEdit);
 }
 
 void Compute() {
   unsigned long now = millis();
-  
+  long input = myEnc.read();
   int timeChange = (now - lastTime);
-  if(timeChange >= sampleTime) { //sets the PID to run at scheduled interval
-    double error = setpoint - lastError); //2070 - 
-    errSum += error; //errSum = errSum + error
-    double dErr = (error - lastError); 
-  
-    output = kp * error + ki * errSum + kd *dErr; 
-    
-    lastErr = error; //updates error and time
+  if(timeChange >= sampleTime) {
+    lastErr = input;
+    error = (setpoint - lastErr); //changed create 'error' variable in Compute to use prev stated variable
+    errSum += error;
+    double dErr = (error - lastErr);
+
+    output = kp*error + ki*errSum + kd*dErr;
+    outputEdit = (output/100)*128; //take out int for tetsing
+    if(controlDirection == 0)
+      vout = 200 + outputEdit; //changed from 128
+    else
+      vout = 0 + outputEdit;
+
+    lastErr = error;
     lastTime = now;
+
+    //Serial.println(error);
+    //Serial.println(vout);
+    //Serial.println(output);
+    //Serial.println(outputEdit);
   }
 }
 
-void SetTunings(double Kp, double Ki, double Kd) {
-  double SampleTimeInSec = ((double)SampleTime)/1000;
-  kp = Kp;
-  ki = Ki * SampleTimeInSec;
-  kd = Kd / SampleTimeInSec;
+void determineDirection() {
+  if(error > 0) //pendulum falling left
+    controlDirection = 1;
+  if(error < 0) //pendulum falling right
+    controlDirection = 0;
+
+  //Serial.println(controlDirection);
 }
 
-
+void limitVoltage() {
+  if(vout > 255)
+    vout = 255;
+  if(vout < 1)
+    vout = 1; 
+}
