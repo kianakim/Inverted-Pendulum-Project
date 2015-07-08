@@ -8,17 +8,18 @@
 #include <Encoder.h>
 
 Encoder myEnc (2,3);
-float vout = 190; 
+float vout = 190;
 
 //PID variables
-unsigned long lastTime; 
+unsigned long lastTime;
 double input, output, error;
 double setpoint = 0;
-double kp = 5, //from 1.5 
-ki = 0, 
-kd = 4;
+double kp = 9,
+ki = 0.5,
+kd =  5; //5
 double errSum, lastErr;
-int sampleTime = 70;
+double errArray[50];
+int sampleTime = 50;
 int outputEdit;
 
 int controlDirection = 1; //0 = left, 1 = right
@@ -36,9 +37,10 @@ void loop() {
   limitVoltage();
 
   analogWrite(6,vout);
-  Serial.println(vout);
+  //Serial.println(vout);
   //Serial.println(error);
   //Serial.println(output);
+  Serial.println(errSum);
   //Serial.println(outputEdit);
 }
 
@@ -49,13 +51,20 @@ void Compute() {
   if(timeChange >= sampleTime) {
     lastErr = input;
     error = (setpoint - lastErr); //changed create 'error' variable in Compute to use prev stated variable
-    errSum += error;
+    int i;
+    for (i=0; i>50; i=i+1){
+      errArray[i] = error;
+      if(i>50){
+        i = 0;
+      }
+    } 
+    errSum = error + errArray[i]; //that's not gonna work. I need the last 10 values. still working on integral number
     double dErr = (error - lastErr);
 
     output = kp*error + ki*errSum + kd*dErr;
-    outputEdit = (output/100)*128; //take out int for tetsing
+    outputEdit = (output/1000)*128; //take out int for tetsing
     if(controlDirection == 0)
-      vout = 200 + outputEdit; //changed from 128
+      vout = 210 + outputEdit; //changed from 128
     else
       vout = 0 + outputEdit;
 
@@ -66,6 +75,7 @@ void Compute() {
     //Serial.println(vout);
     //Serial.println(output);
     //Serial.println(outputEdit);
+    
   }
 }
 
