@@ -18,9 +18,10 @@ double kp = 9,
 ki = 0.5,
 kd =  5; //5
 double errSum, lastErr;
-double errArray[50];
+double errArray[100]; //array will save 100 of the last error values
 int sampleTime = 50;
 int outputEdit;
+int uprightPos[5];
 
 int controlDirection = 1; //0 = left, 1 = right
 
@@ -33,14 +34,17 @@ void setup() {
 void loop() {
   //long input = myEnc.read();
   determineDirection();
+  resetEncoder();
+  if(counter > 100)
+    counter = 0;
   Compute();
   limitVoltage();
 
   analogWrite(6,vout);
-  //Serial.println(vout);
+  Serial.println(vout);
   //Serial.println(error);
   //Serial.println(output);
-  Serial.println(errSum);
+  //Serial.println(errSum);
   //Serial.println(outputEdit);
 }
 
@@ -49,13 +53,10 @@ void Compute() {
   long input = myEnc.read();
   int timeChange = (now - lastTime);
   if(timeChange >= sampleTime) {
-    lastErr = input;
-    error = (setpoint - lastErr); //changed create 'error' variable in Compute to use prev stated variable
+    error = (setpoint - input); //changed create 'error' variable in Compute to use prev stated variable
     int i;
-    for (i=0; i>50; i=i+1){
+    for (i=0; i<100; i=i+1){
       errArray[i] = error;
-      if(i>50){
-        i = 0;
       }
     } 
     errSum = error + errArray[i]; //that's not gonna work. I need the last 10 values. still working on integral number
@@ -94,3 +95,10 @@ void limitVoltage() {
   if(vout < 1)
     vout = 1; 
 }
+
+void resetEncoder() {
+  for(i=0; i<5; i++)
+    uprightPos[i] = i*4000;
+    if(abs(input)>uprightPos[i])
+      setpoint = uprightPos[i];
+  }
