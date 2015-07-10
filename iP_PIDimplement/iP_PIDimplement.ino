@@ -7,22 +7,20 @@
 
 #include <Encoder.h>
 
-Encoder myEnc (2,3);
-float vout = 190;
+Encoder myEnc (2,3); //sets Encoder ports
 
-//PID variables
+//set variables
+float vout;
 unsigned long lastTime;
-double input, output, error;
-double setpoint = 0;
-double kp = 9,
-ki = 0.5,
-kd =  5; //5
-double errSum, lastErr;
-double errArray[100]; //array will save 100 of the last error values
-int sampleTime = 50;
-int outputEdit;
-int uprightPos[5];
-
+int sampleTime = 50; //how often to run Compute(), check encoder
+long input, output, outputEdit, error; //output is direct value from PID equation, error is setpoint-input
+int setpoint = 0; //default setpoint is 0, upright - can be changed in changeSetpoint()
+double kp = 9, // 'P' value
+ki = .1, // 'I' value
+kd =  5; // 'D' value 
+long errSum, errArray[100], lastErr; //variables used for computing Integral and Derivative parts
+int counter = 0; //part of integral calculation
+int rotationNum; //part of changeSetpoint()
 int controlDirection = 1; //0 = left, 1 = right
 
 void setup() {
@@ -32,51 +30,59 @@ void setup() {
 }
 
 void loop() {
-  //long input = myEnc.read();
-  determineDirection();
-  resetEncoder();
-  if(counter > 100)
-    counter = 0;
-  Compute();
-  limitVoltage();
+  determineDirection(); //check direction falling based on encoder value
+  //changeSetpoint(); //change setpoint if pendulum has rotated >360 degrees
+  Compute(); //Compute output based on PID algorithm evert 50 ms
+  limitVoltage(); //limit voltage to 0-255
 
-  analogWrite(6,vout);
-  Serial.println(vout);
+  analogWrite(6,vout); //send calculated voltage to power module
+  //Serial.println(vout);
   //Serial.println(error);
   //Serial.println(output);
-  //Serial.println(errSum);
-  //Serial.println(outputEdit);
+  //Serial.println(errArray[1]);
+  //Serial.println(counter);
+  //Serial.println(setpoint);
 }
 
 void Compute() {
+  if(counter >= 100)
+    counter = 0;
   unsigned long now = millis();
-  long input = myEnc.read();
+  input = myEnc.read(); //read current encoder value
   int timeChange = (now - lastTime);
-  if(timeChange >= sampleTime) {
-    error = (setpoint - input); //changed create 'error' variable in Compute to use prev stated variable
-    int i;
-    for (i=0; i<100; i=i+1){
-      errArray[i] = error;
+  if(abs(input) < 1000) { //stops calculating change if pendulum is past a certain point (90 deg from upright)
+    if(timeChange >= sampleTime) { //controls when to run Compute()
+      // 'P' calculation
+      error = (setpoint - input);
+      
+      // 'I' calculation
+      errSum = 0; //reset errSum, so it only takes the current 100 values
+      errArray[counter] = error; //set current error to the n'th element in array
+      int i;
+      for(i=0; i<100; i++) {
+        errSum += errArray[i]; //add past 100 error values
+        Serial.println(errSum);
       }
-    } 
-    errSum = error + errArray[i]; //that's not gonna work. I need the last 10 values. still working on integral number
-    double dErr = (error - lastErr);
+      
+      // 'D' calculation
+      double dErr = (error - lastErr);
 
-    output = kp*error + ki*errSum + kd*dErr;
-    outputEdit = (output/1000)*128; //take out int for tetsing
-    if(controlDirection == 0)
-      vout = 210 + outputEdit; //changed from 128
-    else
-      vout = 0 + outputEdit;
-
-    lastErr = error;
-    lastTime = now;
-
-    //Serial.println(error);
-    //Serial.println(vout);
-    //Serial.println(output);
-    //Serial.println(outputEdit);
-    
+      output = kp*error + ki*errSum + kd*dErr; 
+      outputEdit = (output/100)*128; //scale the output
+      if(controlDirection == 0)
+        vout = 210 + outputEdit; //changed from 128 because of offset 210
+      else
+        vout = 0 + outputEdit;
+  
+      lastErr = error;
+      lastTime = now;
+      counter++;
+  
+      //Serial.println(error);
+      //Serial.println(vout);
+      //Serial.println(output);
+      //Serial.println(outputEdit)
+    }
   }
 }
 
@@ -85,8 +91,12 @@ void determineDirection() {
     controlDirection = 1;
   if(error < 0) //pendulum falling right
     controlDirection = 0;
+}
 
-  //Serial.println(controlDirection);
+void changeSetpoint() { //change this later
+  rotationNum = abs(input)/4000;
+  if(rotationNum >= 1)
+    setpoint = rotationNum*4000;
 }
 
 void limitVoltage() {
@@ -94,11 +104,6 @@ void limitVoltage() {
     vout = 255;
   if(vout < 1)
     vout = 1; 
+  //if(abs(input) > 1000 && abs(input) < 3000)
+    //vout = 160;    
 }
-
-void resetEncoder() {
-  for(i=0; i<5; i++)
-    uprightPos[i] = i*4000;
-    if(abs(input)>uprightPos[i])
-      setpoint = uprightPos[i];
-  }
