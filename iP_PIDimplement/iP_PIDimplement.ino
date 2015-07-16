@@ -16,11 +16,11 @@ int sampleTime = 50; //how often to run Compute(), check encoder
 long input, output, outputEdit, error; //output is direct value from PID equation, error is setpoint-input
 int setpoint = 0; //default setpoint is 0, upright - can be changed in changeSetpoint()
 double kp = 9, // 'P' value
-ki = .1, // 'I' value
+ki = 0, // 'I' value
 kd =  5; // 'D' value 
 long errSum, errArray[100], lastErr; //variables used for computing Integral and Derivative parts
 int counter = 0; //part of integral calculation
-int rotationNum; //part of changeSetpoint()
+int rotationNum; //part of changeSetpoint(), used to reset setpoint if >360 degrees
 int controlDirection = 1; //0 = left, 1 = right
 
 void setup() {
@@ -61,7 +61,6 @@ void Compute() {
       int i;
       for(i=0; i<100; i++) {
         errSum += errArray[i]; //add past 100 error values
-        Serial.println(errSum);
       }
       
       // 'D' calculation
@@ -84,6 +83,11 @@ void Compute() {
       //Serial.println(outputEdit)
     }
   }
+//}
+
+void changeSetpoint() { //setpoint will change back once it's not 360
+  rotationNum = abs(input)/4095;
+  setpoint = rotationNum*4095;
 }
 
 void determineDirection() {
@@ -91,12 +95,6 @@ void determineDirection() {
     controlDirection = 1;
   if(error < 0) //pendulum falling right
     controlDirection = 0;
-}
-
-void changeSetpoint() { //change this later
-  rotationNum = abs(input)/4000;
-  if(rotationNum >= 1)
-    setpoint = rotationNum*4000;
 }
 
 void limitVoltage() {
