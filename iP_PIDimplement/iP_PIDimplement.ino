@@ -15,10 +15,10 @@ unsigned long lastTime;
 int sampleTime = 50; //how often to run Compute(), check encoder
 long input, output, outputEdit, error; //output is direct value from PID equation, error is setpoint-input
 int setpoint = 0; //default setpoint is 0, upright - can be changed in changeSetpoint()
-double kp = 9, // 'P' value
-ki = 0, // 'I' value
-kd =  5; // 'D' value 
-long errSum, errArray[100], lastErr; //variables used for computing Integral and Derivative parts
+double kp = 19, // 'P' value
+ki = 2, // 'I' value
+kd =  100; // 'D' value 
+long errSum, errArray[150], lastErr; //variables used for computing Integral and Derivative parts
 int counter = 0; //part of integral calculation
 int rotationNum; //part of changeSetpoint(), used to reset setpoint if >360 degrees
 int controlDirection = 1; //0 = left, 1 = right
@@ -31,12 +31,12 @@ void setup() {
 
 void loop() {
   determineDirection(); //check direction falling based on encoder value
-  //changeSetpoint(); //change setpoint if pendulum has rotated >360 degrees
+  //changeSetpoint(); //fix later. change setpoint if pendulum has rotated >360 degrees
   Compute(); //Compute output based on PID algorithm evert 50 ms
   limitVoltage(); //limit voltage to 0-255
 
   analogWrite(6,vout); //send calculated voltage to power module
-  //Serial.println(vout);
+  Serial.println(vout);
   //Serial.println(error);
   //Serial.println(output);
   //Serial.println(errArray[1]);
@@ -45,12 +45,12 @@ void loop() {
 }
 
 void Compute() {
-  if(counter >= 100)
+  if(counter >= 150)
     counter = 0;
   unsigned long now = millis();
   input = myEnc.read(); //read current encoder value
   int timeChange = (now - lastTime);
-  if(abs(input) < 1000) { //stops calculating change if pendulum is past a certain point (90 deg from upright)
+  //if(abs(input) < 1000) { //stops calculating change if pendulum is past a certain point (90 deg from upright)
     if(timeChange >= sampleTime) { //controls when to run Compute()
       // 'P' calculation
       error = (setpoint - input);
@@ -59,9 +59,9 @@ void Compute() {
       errSum = 0; //reset errSum, so it only takes the current 100 values
       errArray[counter] = error; //set current error to the n'th element in array
       int i;
-      for(i=0; i<100; i++) {
+      for(i=0; i<150; i++) {
         errSum += errArray[i]; //add past 100 error values
-      }
+      } 
       
       // 'D' calculation
       double dErr = (error - lastErr);
@@ -86,8 +86,10 @@ void Compute() {
 //}
 
 void changeSetpoint() { //setpoint will change back once it's not 360
-  rotationNum = abs(input)/4095;
-  setpoint = rotationNum*4095;
+  if(abs(error) > 3000) { //3000 encoder counts = about 270 degrees
+    rotationNum = abs(input)/3000; 
+    setpoint = rotationNum*4095; //4095 encoder counts = 360 degrees
+  }
 }
 
 void determineDirection() {
