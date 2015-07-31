@@ -25,6 +25,8 @@ long errSum, errArray[100], dErr, dErrArray[5]; //variables used for computing I
 int counter = 0, counter2 = 0; //part of integral calculation
 int controlDirection = 1; //0 = left, 1 = right
 unsigned long now;
+long lastPot;
+boolean over;
 
 void setup() {
   pinMode(6, OUTPUT);
@@ -37,7 +39,7 @@ void loop() {
     counter = 0; 
   determineDirection(); //check direction falling based on encoder value
   resetEncoder(); //reset the encoder to 0 when input >360 degrees
-  centerCart();
+  centerCart(); //controls kc (setpoint variable) for centering cart
   Compute(); //Compute output based on PID algorithm evert 50 ms
   setLimits(); //add outputs from pendulum and cart PID + limit voltage to 0-255
 
@@ -52,7 +54,7 @@ void Compute() {
   if(timeChange >= sampleTime) { //controls when to run Compute()
       // 'P' calculation
     error = (setpoint - input);
-      
+        
       // 'I' calculation
     errSum = 0; //reset errSum, so it only takes the current 100 values
     errArray[counter] = error; //set current error to the n'th element in array
@@ -84,8 +86,9 @@ void resetEncoder() { //setpoint will change back once it's not 360
 }
 
 void centerCart() {
-    inputC = myEnc2.read(); //reads cart encoder values
-    setpoint = inputC*kc;
+  inputC = myEnc2.read(); //reads cart encoder values
+  pot = analogRead(A1);
+  setpoint = inputC*kc;
 }
 
 void determineDirection() {
@@ -100,9 +103,10 @@ void setLimits() {
     vout = 255;
   if(vout < 1)
     vout = 1; 
-  //if(abs(input) > 1000 && abs(input) < 3000)
-    //vout = 128;    
- /*   
+  if(abs(input) > 500 && abs(input) < 3000)
+    vout = 128;   
+}
+/*
   //print status:
   Serial.print("Encoder Value: ");
   Serial.print(inputC);
@@ -112,4 +116,15 @@ void setLimits() {
   //Serial.print(kc);
   Serial.print("\n");
 */
+
+/*
+void changeCenter() {
+  long newPot = analogRead(A1); //reading potentiometer in pin 10
+  newPot = map(newPot, 0, 1023, 0, 35270);
+  int diff = lastPot - newPot;
+  if(abs(diff) > 40)
+    myEnc2.write(diff);
+  //Serial.println(diff);
+  lastPot = newPot;
 }
+*/
