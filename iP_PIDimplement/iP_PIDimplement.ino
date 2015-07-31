@@ -7,8 +7,8 @@
 
 #include <Encoder.h>
 
-Encoder myEnc2 (3,4); //pendulum encoder
-Encoder myEnc (2,5); //cart encoder
+Encoder myEnc2 (3, 4); //pendulum encoder
+Encoder myEnc (2, 5); //cart encoder
 
 float vout;
 int sampleTime = 3, timeChange; //how often to run Compute(), check encoder
@@ -18,93 +18,92 @@ double inputC, kc = 0.004; //variable to control setpoint in centerCart() method
 //pendulum PID variables
 long input, output, error; //output is direct value from PID equation, error is setpoint-input
 int setpoint = 0; //default setpoint is 0, upright - can be changed in changeSetpoint()
-double kp = 230, // 'P' value - 210
-ki = 6, // 'I' value - 6
-kd = 180; // 'D' value - 150
+double kp = 230, // 'P' value - 230
+ki = 9, // 'I' value - 9
+kd = 200; // 'D' value - 200
 long errSum, errArray[100], dErr, dErrArray[5]; //variables used for computing Integral and Derivative parts
 int counter = 0, counter2 = 0; //part of integral calculation
 int controlDirection = 1; //0 = left, 1 = right
 unsigned long now;
-long lastPot;
-boolean over;
 
 void setup() {
   pinMode(6, OUTPUT);
-  analogWrite(6,160);
+  analogWrite(6, 160);
   //Serial.begin(9600);
 }
 
 void loop() {
-  if(counter >= 100)
-    counter = 0; 
+  if (counter >= 100)
+    counter = 0;
   determineDirection(); //check direction falling based on encoder value
   resetEncoder(); //reset the encoder to 0 when input >360 degrees
   centerCart(); //controls kc (setpoint variable) for centering cart
   Compute(); //Compute output based on PID algorithm evert 50 ms
   setLimits(); //add outputs from pendulum and cart PID + limit voltage to 0-255
 
-  analogWrite(6,vout); //send calculated voltage to power module
+  analogWrite(6, vout); //send calculated voltage to power module
   counter++;
 }
 
 void Compute() {
   now = millis();
   input = myEnc.read(); //read current encoder value
-  timeChange = (now - lastTime);
-  if(timeChange >= sampleTime) { //controls when to run Compute()
-      // 'P' calculation
+  timeChange = (now - lastTime); //update 'timeChange' variable
+  if (timeChange >= sampleTime) { //controls when to run Compute()
+    // 'P' calculation
     error = (setpoint - input);
-        
-      // 'I' calculation
+
+    // 'I' calculation
     errSum = 0; //reset errSum, so it only takes the current 100 values
     errArray[counter] = error; //set current error to the n'th element in array
     int i;
-    for(i=0; i<100; i++) {
+    for (i = 0; i < 100; i++) {
       errSum += errArray[i]; //add past 100 error values
-    } 
-      
-      // 'D' calculation
-    errArray[counter] = error; //saving last 6 error values
-    if(counter == 5) 
+    }
+
+    // 'D' calculation
+    //errArray[counter] = error; //saving last 6 error values
+    if (counter == 5)
       dErr = error - errArray[0];
     else
       dErr = error - errArray[abs(counter - 5)];
 
-    output = kp*error + ki*errSum + kd*dErr;
-    if(controlDirection == 0)
-      vout = 210 + output; //changed from 128 because of offset 240
-    if(controlDirection == 1)
-      vout = -10 + output;
-    
+    output = kp * error + ki * errSum + kd * dErr;
+    if (controlDirection == 0)
+      vout = 210 + output; //compensating for weaker motor
+    if (controlDirection == 1)
+      vout = -10 + output; //compensating for weaker motor
+
     lastTime = now;
   }
 }
 
 void resetEncoder() { //setpoint will change back once it's not 360
-  if(abs(input) >= 4095) //3000 encoder counts = about 270 degrees
+  if (abs(input) >= 4095) //4095 encoder counts = 360 degrees
     myEnc.write(0);
 }
 
 void centerCart() {
   inputC = myEnc2.read(); //reads cart encoder values
-  pot = analogRead(A1);
-  setpoint = inputC*kc;
+  int pot = analogRead(A1);  //read potentiometer
+  pot = map(pot, 0, 1023, 0, 25000); //scale potentiometer value
+  setpoint = (inputC - pot) * kc;
 }
 
 void determineDirection() {
-  if(error > 0) //pendulum falling left
+  if (error > 0) //pendulum falling left
     controlDirection = 1;
-  if(error < 0) //pendulum falling right
+  if (error < 0) //pendulum falling right
     controlDirection = 0;
 }
 
 void setLimits() {
-  if(vout > 255)
+  if (vout > 255)
     vout = 255;
-  if(vout < 1)
-    vout = 1; 
-  if(abs(input) > 500 && abs(input) < 3000)
-    vout = 128;   
+  if (vout < 1)
+    vout = 1;
+  if (abs(input) > 500 && abs(input) < 3000) //idle mode
+    vout = 128;
 }
 /*
   //print status:
@@ -115,16 +114,4 @@ void setLimits() {
   //Serial.print("   kc   ");
   //Serial.print(kc);
   Serial.print("\n");
-*/
-
-/*
-void changeCenter() {
-  long newPot = analogRead(A1); //reading potentiometer in pin 10
-  newPot = map(newPot, 0, 1023, 0, 35270);
-  int diff = lastPot - newPot;
-  if(abs(diff) > 40)
-    myEnc2.write(diff);
-  //Serial.println(diff);
-  lastPot = newPot;
-}
 */
